@@ -1,0 +1,626 @@
+---
+title: 'Soil Eosion in California County'
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+  word_document:
+    toc: yes
+---
+
+
+```{r setup, include=FALSE, echo=FALSE}
+
+knitr::opts_chunk$set(
+    echo = TRUE,
+    message = FALSE,
+    warning = FALSE,
+    error = FALSE, 
+    dpi = 400
+)
+
+```
+
+
+# Setup
+
+## Load libraries
+
+```{r}
+library(tidyverse)
+library(sf)
+library(raster)
+library(usdata)
+library(tigris)
+library(skimr)
+library(DataExplorer)
+library(raster)
+library(terra)
+```
+
+
+# Soil Erosion
+
+RUSLE (A = R x K x LS x C x P)
+
+## Resolutions
+
+- Rainfall = 4 km
+- Erodibility = 30 m
+- Slope = 10 m
+- Crop scape = 30
+
+
+## Rainfall Erosivity
+
+### Load data
+
+```{r}
+# rainfall - 2021
+rnf <- stack("Data/Rainfall/dataset-sis-biodiversity-cmip5-global-83e8ca0e-4eea-4051-a911-c3299d0f2380 (1)/BIO12_gfdl-esm2m_rcp85_r1i1p1_1950-2100_v1.0.nc")
+rnf <- mean(rnf[[72]])*3600*24*365*1000
+plot(rnf)
+```
+
+
+### Plot
+
+
+```{r, eval=FALSE, include=TRUE}
+#plot(rnf)
+#sum_rnf <- sum(rnf)
+
+plot(rnf)
+plot(st_geometry(california), col = "red", add = TRUE)
+```
+
+
+### Cropping and masking
+
+#### Boundary lines
+
+```{r}
+library(tigris)
+
+# california
+california <- counties(cb = TRUE) %>% 
+  filter(STATE_NAME == "California")
+
+sj <- counties(cb = TRUE) %>% 
+  filter(NAME == "San Joaquin")
+
+plot(rnf)
+plot(st_geometry(california), add = TRUE)
+```
+
+
+```{r, eval=FALSE, include=TRUE}
+# cropping
+crop_rnf <- raster::crop(rnf, extent(california))
+plot(crop_rnf)
+
+# masking
+mask_rnf <- raster::mask(crop_rnf, mask = california)
+plot(mask_rnf)
+
+# resampling/interpolation
+target <- mask_rnf
+res(target) <- 0.0003176353
+res_rnf <- raster::resample(mask_rnf, target, method = "bilinear")
+plot(res_rnf)
+
+raster::writeRaster(res_rnf, filename = file.path("Data/Rainfall/PRISM//res_rnf_california.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+```{r, eval=FALSE, include=TRUE}
+res_rnf <- raster("Data/Rainfall/PRISM/res_rnf_california.tif")
+plot(res_rnf)
+plot(st_geometry(sj), add = TRUE)
+
+# cropping
+crop_rnf <- raster::crop(res_rnf, extent(sj))
+plot(crop_rnf)
+
+# masking
+mask_rnf <- raster::mask(crop_rnf, mask = sj)
+plot(mask_rnf)
+
+raster::writeRaster(mask_rnf, filename = file.path("Data/Rainfall/PRISM//res_rnf_sj.tif"), format="GTiff", overwrite=TRUE)
+```
+
+### Erosivity factor
+
+```{r}
+# load data 
+rnf_sj <- raster("Data/Rainfall/PRISM/res_rnf_sj.tif")
+plot(rnf_sj)
+
+# The equation of Moore
+# Implement the equation of Moore as a function in R
+calculate_r_moore <- function(p) {
+  ke <- 11.46*p - 2226
+  r <- 0.029*ke - 26
+  r_si <- 17.02*r # Conversion from imperial to SI units
+  return(r_si)
+}
+
+r_moore <- calc(x = rnf_sj, fun = calculate_r_moore)
+plot(r_moore)
+
+# save raster
+raster::writeRaster(r_moore, filename = file.path("Data/Rainfall/PRISM//erosivity_factor.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+
+## Erodibility factor (K)
+
+### Load data
+
+```{r}
+ef <- raster("Data/Erodibility/drive-download-20221024T195607Z-001/SJ_Erodibility.tif")
+raster::plot(ef)
+```
+
+
+
+
+## Slope length and steepness
+
+
+### DEM
+
+#### Load data
+
+```{r, eval=FALSE, include=TRUE}
+dem1 <- raster("Data/DEM or DSM/USGS_13_n38w121_20220103.tif")
+dem2 <- raster("Data/DEM or DSM/USGS_13_n38w122_20220810.tif")
+dem3 <- raster("Data/DEM or DSM/USGS_13_n39w121_20220206.tif")
+dem4 <- raster("Data/DEM or DSM/USGS_13_n39w122_20220206.tif")
+
+dem_2022 <- raster::mosaic(dem1, dem2, dem3, dem4,  fun = 'mean')
+plot(dem_2022)
+#plot(st_geometry(california), add = TRUE)
+plot(st_geometry(sj), add = TRUE, col = "red")
+
+
+sj =sf::st_set_crs(sj, crs(dem_2022))
+plot(dem)
+plot(st_geometry(sj), add = TRUE)
+```
+
+
+### Mosaic
+
+```{r, eval=FALSE, include=TRUE}
+dem_2022 <- raster::mosaic(dem1, dem2, dem3, dem4,  fun = 'mean')
+
+# plot DEM
+plot(dem_2022)
+plot(st_geometry(sj), add = TRUE, col = "red")
+```
+
+
+### Crop and Mask
+
+```{r, eval=FALSE, include=TRUE}
+# crop
+crop_dem <- crop(dem_2022, extent(sj))
+plot(crop_dem)
+
+# mask
+mask_dem <- mask(crop_dem, sj)
+plot(mask_dem)
+
+# save 
+raster::writeRaster(mask_dem, filename = file.path("Data/DEM or DSM/sj_dem.tif"), format="GTiff", overwrite=TRUE)
+```
+
+### Load clipped dem
+
+```{r}
+sj_dem <- raster("Data/DEM or DSM/sj_dem.tif")
+plot(sj_dem)
+```
+
+
+### Slope
+
+```{r}
+slope <- terrain(sj_dem, "slope", unit = "degrees")
+plot(slope)
+
+# save 
+#raster::writeRaster(slope, filename = file.path("Data/DEM or DSM/sj_slope.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+### LS
+
+```{r, eval=FALSE, include=TRUE}
+# flow accumulation
+flow_acc <- raster("Data/DEM or DSM/FlowAcc_sj_1.tif/FlowAcc_sj_1.tif")
+
+plot(flow_acc)
+plot(st_geometry(sj), add = TRUE)
+
+# crop
+crop_flow_acc <- crop(flow_acc, extent(sj))
+mask_flow_acc <- mask(crop_flow_acc, sj)
+plot(mask_flow_acc)
+
+# resampling/interpolation
+target <- slope
+res(target) <- res(slope)
+mask_flow_acc <- raster::resample(mask_flow_acc, target, method = "bilinear")
+plot(mask_flow_acc)
+```
+
+
+```{r, eval=FALSE, include=TRUE}
+p1 <- (((mask_flow_acc*9.28) / 22.1)^0.4)
+p2 <- ((sin(slope*0.01745)/0.09)^1.4)
+
+LS = p1 * p2 * 1.4
+LS
+
+plot(LS)
+
+hist(LS)
+
+
+#LS <- (((mask_flow_acc*9.28) / 22.1)^0.4) * ((sin(slope*0.01745)/0.09)^1.4) * 1.4
+
+
+#Power("FlowAcc_sj" * 9.28 / 22.1, 0.4) * Power(Sin("sj_slope.tif"* 0.01745) / 0.09, 1.4) * 1.4
+```
+
+#### LS from ArcGIS Pro
+
+```{r, eval=FALSE, include=TRUE}
+# flow accumulation
+ls <- raster("Data/DEM or DSM/LS_1_1/LS_1_1.tif")
+
+plot(ls)
+plot(st_geometry(sj), add = TRUE)
+
+# crop
+crop_ls <- crop(ls, extent(sj))
+mask_ls <- mask(crop_ls, sj)
+plot(mask_ls)
+
+mask_ls
+ef
+
+# resampling/interpolation
+target <- slope
+res(target) <- res(ef) # 30 meters
+mask_ls <- raster::resample(mask_ls, target, method = "bilinear")
+plot(mask_ls)
+
+# save 
+raster::writeRaster(mask_ls, filename = file.path("Data/LS /LS_factor.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+```{r}
+# load LS factor
+ls_factor <- raster("Data/LS /LS_factor.tif")
+plot(ls_factor)
+```
+
+
+
+#### NN
+
+```{r, eval=FALSE, include=TRUE}
+# reclassification
+m <- c(-Inf, 1, 0.2,
+       1, 3, 0.3,
+       3, 5, 0.4,
+       5, Inf, 0.5)
+
+# make a mtrix
+rclmat <- matrix(m, ncol = 3, byrow = TRUE)
+rclmat
+
+# reclassify
+NN <- reclassify(slope, rclmat)
+plot(NN)
+```
+
+
+
+
+
+
+```{r, eval=FALSE, include=TRUE}
+LS = (0.065 + 0.0456*(slope) + 0.006541*(slope)^2)*(slope length/22.1)^NN
+```
+
+Esri community; To calculate the LS factor for the RUSLE equation, first calculate flow accumulation (facc) and slope in degrees (slp). Then a bit of map algebra in the raster calculator yields LS.
+
+Power(facc * cell resolution / 22.1, 0.4) * Power(Sin(slp * 0.01745) / 0.09, 1.4) * 1.4
+
+## Cover management
+
+### Load data
+
+
+```{r}
+cs <- raster("Data/Crop Cover/drive-download-20221025T182147Z-001/Reclassify_SJ_Cropcover_2021.tif")
+plot(cs)
+
+# crop and mask
+crop_cs <- crop(cs, extent(sj))
+mask_cs <- mask(crop_cs, sj)
+plot(mask_cs)
+
+# crop factor
+c_factor <- mask_cs/100
+plot(c_factor)
+```
+
+
+## Support Practices: Cropping (P-factor)
+
+- Ctillage = 1 for conventional Strip cropping;
+- Ctillage = 0.35 for conservation contour cropping; 
+- Ctillage = 0.25 for terrace cropping.
+
+
+# Erosion calculation
+
+## setup
+
+```{r}
+e_factor <- raster::resample(ef, r_moore, method = "bilinear")
+ls_factor <- raster::resample(ls_factor, r_moore, method = "bilinear")
+c_factor <- raster::resample(c_factor, r_moore, method = "bilinear")
+```
+
+
+## First scenario
+
+### Conventional Strip Cropping
+
+```{r}
+RUSLE_1 <- r_moore * e_factor * ls_factor * c_factor * 1
+plot(RUSLE_1)
+
+# save 
+raster::writeRaster(RUSLE_1, filename = file.path("RUSLE_1.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+## Second scenario
+
+### Conservation Contour Cropping
+
+
+```{r}
+RUSLE_2 <- r_moore * e_factor * ls_factor * c_factor * 0.35
+plot(RUSLE_2)
+
+# save 
+raster::writeRaster(RUSLE_2, filename = file.path("RUSLE_2.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+## Third scenario
+
+### Terrace Cropping
+
+
+```{r}
+RUSLE_3 <- r_moore * e_factor * ls_factor * c_factor * 0.25
+plot(RUSLE_3)
+
+# save 
+raster::writeRaster(RUSLE_3, filename = file.path("RUSLE_3.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+## Comparison of scenarios
+
+### RUSLE 1 vs RUSLE 2
+
+```{r}
+r1_r2 <- RUSLE_1 - RUSLE_2
+plot(r1_r2)
+```
+
+
+
+# Projections
+
+```{r}
+library(wesanderson)
+# Gradient color
+pal <- wes_palette("Zissou1", 100, type = "continuous")
+```
+
+
+## Load ppt data
+
+```{r}
+fut_ppt <- stack("Data/Rainfall/dataset-sis-biodiversity-cmip5-global-83e8ca0e-4eea-4051-a911-c3299d0f2380 (1)/BIO12_gfdl-esm2m_rcp85_r1i1p1_1950-2100_v1.0.nc")
+plot(fut_ppt, col = pal)
+```
+
+
+## Referencing
+
+```{r}
+library(tigris)
+us <- states(cb = TRUE) %>% 
+  filter(!NAME %in% c("Puerto Rico", "Guam", "American Samoa", "United States Virgin Islands", "Commonwealth of the Northern Mariana Islands", "Alaska", "Hawaii")) 
+
+plot(fut_ppt[[1]])
+plot(st_geometry(us), add = TRUE)
+```
+
+
+## Select study years
+
+- 2030
+
+- 2050
+
+- 2070
+  
+- 2100
+
+
+```{r}
+# 2030s
+y2030 <- fut_ppt[[81]]*3600*24*365*1000
+plot(y2030)
+
+# 2050s
+y2050 <- fut_ppt[[101]]*3600*24*365*1000
+plot(y2050)
+
+# 2070s
+y2070 <- fut_ppt[[121]]*3600*24*365*1000
+plot(y2070)
+
+# 2100s
+y2100 <- fut_ppt[[151]]*3600*24*365*1000
+plot(y2100)
+
+# stack
+fut_ppt <- stack(y2030, y2050, y2070, y2100)
+names(fut_ppt) <- c("2030", "2050", "2070", "2100")
+plot(fut_ppt)
+```
+
+
+
+## Cropping and Masking
+
+```{r, eval=FALSE, include=TRUE}
+# cropping
+crop_ppt <- raster::crop(fut_ppt, extent(california))
+plot(crop_ppt)
+
+# masking
+mask_ppt <- raster::mask(crop_ppt, mask = california)
+plot(mask_ppt)
+
+# load target layer
+res_rnf <- raster("Data/Rainfall/PRISM/res_rnf_california.tif")
+
+# resampling/interpolation
+res_ppt <- raster::resample(mask_ppt, res_rnf, method = "bilinear")
+plot(res_ppt)
+
+raster::writeRaster(res_ppt, filename = file.path("Data/FUTURE_PROJECTIONS/res_ppt_california.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+```{r, eval=FALSE, include=TRUE}
+res_ppt <- brick("Data/FUTURE_PROJECTIONS/res_ppt_california.tif")
+plot(res_ppt)
+
+plot(res_ppt[[1]])
+plot(st_geometry(sj), add = TRUE)
+
+# cropping
+crop_ppt <- raster::crop(res_ppt, extent(sj))
+plot(crop_ppt)
+
+# masking
+mask_ppt <- raster::mask(crop_ppt, mask = sj)
+plot(mask_ppt)
+
+raster::writeRaster(mask_ppt, filename = file.path("Data/FUTURE_PROJECTIONS/res_ppt_sj.tif"), format="GTiff", overwrite=TRUE)
+```
+
+
+```{r}
+res_ppt <- stack("Data/FUTURE_PROJECTIONS/res_ppt_sj.tif")
+#res_ppt <- res_ppt*3600*24*365*1000
+names(res_ppt) <- c("2030", "2050", "2070", "2100")
+plot(res_ppt)
+
+# comparison of decades
+ppt_df <- res_ppt %>% 
+  as.data.frame(xy = TRUE) %>% 
+  pivot_longer(names_to = "key", values_to = "value", cols = c(3:4)) %>% 
+  filter(!is.na(value))
+
+ppt_df %>% 
+  ggplot() +
+  geom_raster(aes(x = x, y = y, fill = value)) +
+  scale_fill_distiller(palette = "RdPu", direction = 1) +
+  theme_minimal() +
+  facet_wrap(~ key)
+  
+
+# erosivity factor
+r_factor_future <- calc(x = res_ppt, fun = calculate_r_moore)
+
+# setup
+r_factor_future <- raster::resample(r_factor_future, r_moore, method = "bilinear")
+plot(r_factor_future)
+```
+
+
+
+## First scenario
+
+### Conventional Strip Cropping
+
+```{r}
+RUSLE_1_future <- r_factor_future * e_factor * ls_factor * c_factor * 1
+names(RUSLE_1_future) <- c("2030", "2050", "2070", "2100")
+plot(RUSLE_1_future)
+
+# save 
+raster::writeRaster(RUSLE_1_future, filename = file.path("RUSLE_1_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
+```
+
+
+## Second scenario
+
+### Conservation Contour Cropping
+
+
+```{r}
+RUSLE_2_future <- r_factor_future * e_factor * ls_factor * c_factor * 0.35
+names(RUSLE_2_future) <- c("2030", "2050", "2070", "2100")
+plot(RUSLE_2_future)
+
+# save 
+raster::writeRaster(RUSLE_2_future, filename = file.path("RUSLE_2_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
+```
+
+
+## Third scenario
+
+### Terrace Cropping
+
+
+```{r}
+RUSLE_3_future <- r_factor_future * e_factor * ls_factor * c_factor * 0.25
+names(RUSLE_3_future) <- c("2030", "2050", "2070", "2100")
+plot(RUSLE_3_future)
+
+# save 
+raster::writeRaster(RUSLE_3_future, filename = file.path("RUSLE_3_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
+```
+
+
+
+# EDA
+
+```{r}
+rnf_sj <- raster::resample(rnf_sj, res_ppt, method = "bilinear")
+names(rnf_sj) <- "2021"
+
+plot(stack(rnf_sj, res_ppt), col = rev(pal))
+```
+
