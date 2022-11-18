@@ -1,3 +1,0 @@
-# test file
-
-plot(cars)

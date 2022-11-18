@@ -56,7 +56,7 @@ RUSLE (A = R x K x LS x C x P)
 
 ### Load data
 
-```{r}
+```{r, eval=FALSE, include=TRUE}
 # rainfall - 2021
 rnf <- stack("Data/Rainfall/dataset-sis-biodiversity-cmip5-global-83e8ca0e-4eea-4051-a911-c3299d0f2380 (1)/BIO12_gfdl-esm2m_rcp85_r1i1p1_1950-2100_v1.0.nc")
 rnf <- mean(rnf[[72]])*3600*24*365*1000
@@ -84,14 +84,14 @@ plot(st_geometry(california), col = "red", add = TRUE)
 library(tigris)
 
 # california
-california <- counties(cb = TRUE) %>% 
+california <- counties(cb = TRUE, progress_bar = FALSE) %>% 
   filter(STATE_NAME == "California")
 
-sj <- counties(cb = TRUE) %>% 
+sj <- counties(cb = TRUE, progress_bar = FALSE) %>% 
   filter(NAME == "San Joaquin")
 
-plot(rnf)
-plot(st_geometry(california), add = TRUE)
+plot(st_geometry(california))
+plot(st_geometry(sj), col = "blue", add = TRUE)
 ```
 
 
@@ -134,7 +134,7 @@ raster::writeRaster(mask_rnf, filename = file.path("Data/Rainfall/PRISM//res_rnf
 
 ```{r}
 # load data 
-rnf_sj <- raster("Data/Rainfall/PRISM/res_rnf_sj.tif")
+rnf_sj <- raster("Data/Rainfall/res_rnf_sj.tif")
 plot(rnf_sj)
 
 # The equation of Moore
@@ -150,7 +150,7 @@ r_moore <- calc(x = rnf_sj, fun = calculate_r_moore)
 plot(r_moore)
 
 # save raster
-raster::writeRaster(r_moore, filename = file.path("Data/Rainfall/PRISM//erosivity_factor.tif"), format="GTiff", overwrite=TRUE)
+raster::writeRaster(r_moore, filename = file.path("Data/Rainfall/erosivity_factor.tif"), format="GTiff", overwrite=TRUE)
 ```
 
 
@@ -160,11 +160,9 @@ raster::writeRaster(r_moore, filename = file.path("Data/Rainfall/PRISM//erosivit
 ### Load data
 
 ```{r}
-ef <- raster("Data/Erodibility/drive-download-20221024T195607Z-001/SJ_Erodibility.tif")
+ef <- raster("Data/Erodibility/SJ_Erodibility.tif")
 raster::plot(ef)
 ```
-
-
 
 
 ## Slope length and steepness
