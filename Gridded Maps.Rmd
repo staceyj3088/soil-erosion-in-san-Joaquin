@@ -1,0 +1,187 @@
+---
+title: 'Gridded Maps - Soil Eosion'
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+  word_document:
+    toc: yes
+---
+
+
+```{r setup, include=FALSE, echo=FALSE}
+
+knitr::opts_chunk$set(
+    echo = TRUE,
+    message = FALSE,
+    warning = FALSE,
+    error = FALSE, 
+    dpi = 400
+)
+
+```
+
+
+# Setup
+
+## Load libraries
+
+```{r}
+library(tidyverse)
+library(sf)
+library(raster)
+library(usdata)
+library(tigris)
+library(skimr)
+library(DataExplorer)
+library(raster)
+library(terra)
+```
+
+
+# 2021
+
+## Load data
+
+```{r}
+y_2021_r1 <- raster("RUSLE_1.tif")
+y_2021_r2 <- raster("RUSLE_2.tif")
+y_2021_r3 <- raster("RUSLE_3.tif")
+
+# stack
+RUSLE_2021 <- raster::stack(y_2021_r1, y_2021_r2, y_2021_r3)
+plot(RUSLE_2021)
+```
+
+
+## Visualization
+
+```{r}
+# comparison of decades
+rusle_2021_df <- RUSLE_2021 %>% 
+  as.data.frame(xy = TRUE) %>% 
+  pivot_longer(names_to = "key", values_to = "value", cols = c(3:5)) %>% 
+  filter(!is.na(value)) %>% 
+  mutate(key = recode(key, 
+                      "layer.1" = "Conventional Strip Cropping",
+                      "layer.2" = "Conservation Contour Cropping",
+                      "layer.3" = "Terrace Cropping")) %>% 
+  mutate(key = factor(key, levels = c("Conventional Strip Cropping", "Conservation Contour Cropping", "Terrace Cropping")))
+
+R_2021 <- rusle_2021_df %>% 
+  #sample_n(100000) %>% 
+  ggplot() +
+  geom_raster(aes(x = x, y = y, fill = value)) +
+  #scale_fill_distiller(palette = "RdPu", direction = 1) +
+  scale_fill_distiller(palette = "Spectral", direction = -1, limits = c(0.0, 13525.35)) +
+  labs(title = "RUSLE Values for San Joaquin County (2021)", fill = "RUSLE") +
+  theme_void() +
+  facet_wrap(~ key) +
+  theme(legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5),
+        text = element_text(size = 16)) +
+  guides(fill = guide_colourbar(direction = 'horizontal',
+                                title='Soil erosion (tons/acre/year)', ##rename default legend
+                                title.position='top',
+                                title.hjust=0.5,
+                                ticks.colour='#f5f5f2',
+                                ticks.linewidth=2,
+                                barwidth = 20,
+                                barheight = 1))
+
+ggsave("Maps/RUSLE_2021_Maps.png", R_2021, dpi = 300, height = 6, width = 9)
+#quantile(rusle_2021_df$value, probs = c(0.025, 0.975))
+```
+
+
+# Projections
+
+## Load data
+
+
+```{r}
+# RUSLE 1
+R1_y_2030 <- raster("RUSLE_1_future_1.tif")
+R1_y_2050 <- raster("RUSLE_1_future_2.tif")
+R1_y_2070 <- raster("RUSLE_1_future_3.tif")
+R1_y_2100 <- raster("RUSLE_1_future_4.tif")
+
+# RUSLE 2
+R2_y_2030 <- raster("RUSLE_2_future_1.tif")
+R2_y_2050 <- raster("RUSLE_2_future_2.tif")
+R2_y_2070 <- raster("RUSLE_2_future_3.tif")
+R2_y_2100 <- raster("RUSLE_2_future_4.tif")
+
+# RUSLE 3
+R3_y_2030 <- raster("RUSLE_3_future_1.tif")
+R3_y_2050 <- raster("RUSLE_3_future_2.tif")
+R3_y_2070 <- raster("RUSLE_3_future_3.tif")
+R3_y_2100 <- raster("RUSLE_3_future_4.tif")
+
+
+# stack
+RUSLE_proj <- raster::stack(R1_y_2030, R1_y_2050, R1_y_2070, R1_y_2100, R2_y_2030, R2_y_2050, R2_y_2070, R2_y_2100, R3_y_2030, R3_y_2050, R3_y_2070, R3_y_2100)
+
+names(RUSLE_proj) <- c("RUSLE_1_future_1", "RUSLE_1_future_2", "RUSLE_1_future_3", "RUSLE_1_future_4", "RUSLE_2_future_1", "RUSLE_2_future_2", "RUSLE_2_future_3", "RUSLE_2_future_4", "RUSLE_3_future_1", "RUSLE_3_future_2", "RUSLE_3_future_3", "RUSLE_3_future_4")
+
+plot(RUSLE_proj)
+```
+
+
+## converting to dataframe
+
+```{r}
+# comparison of decades
+rusle_proj_df <- RUSLE_proj %>% 
+  as.data.frame(xy = TRUE) %>% 
+  pivot_longer(names_to = "key", values_to = "value", cols = c(3:14)) %>% 
+  filter(!is.na(value))  %>% 
+  separate(key, into = c("Scenario", "Year"), sep = 7) %>% 
+  mutate(Scenario = recode(Scenario, 
+                          "RUSLE_1" = "Conventional Strip Cropping",
+                          "RUSLE_2" = "Conservation Contour Cropping",
+                          "RUSLE_3" = "Terrace Cropping")) %>% 
+  mutate(Year = recode(Year, 
+                       "_future_1" = "2030",
+                       "_future_2" = "2050",
+                       "_future_3" = "2070",
+                       "_future_4" = "2100"))
+
+rusle_proj_df %>% 
+  distinct(Scenario)
+
+# factorize data
+rusle_proj_df$Scenario <- factor(rusle_proj_df$Scenario, levels =  c("Conventional Strip Cropping", "Conservation Contour Cropping", "Terrace Cropping"))
+```
+
+
+## Visualization
+
+```{r}
+R_proj <- rusle_proj_df %>% 
+  #filter(key == "2021") %>% 
+  #sample_n(500) %>% 
+  ggplot() +
+  geom_raster(aes(x = x, y = y, fill = value)) +
+  #scale_fill_distiller(palette = "RdPu", direction = 1) +
+  scale_fill_distiller(palette = "Spectral", direction = -1, limits = c(0.0, 9791.315)) +
+  labs(fill = "RUSLE") +
+  theme_void() +
+  facet_grid(Year~ Scenario, labeller = label_wrap_gen(width=20)) +
+  theme(legend.position = "bottom",
+        text = element_text(size = 16)) +
+  guides(fill = guide_colourbar(direction = 'horizontal',
+                                #title='RUSLE', ##rename default legend
+                                title.position='top',
+                                title.hjust=0.5,
+                                ticks.colour='#f5f5f2',
+                                ticks.linewidth=2,
+                                barwidth = 20,
+                                barheight = 1))
+
+ggsave("Maps/RUSLE_Proj_Maps.png", R_proj, dpi = 300, height = 11, width = 7)
+
+#quantile(rusle_proj_df$value, probs = c(0.025, 0.975))
+```
+
