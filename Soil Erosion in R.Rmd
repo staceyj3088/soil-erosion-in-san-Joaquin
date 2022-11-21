@@ -59,6 +59,7 @@ RUSLE (A = R x K x LS x C x P)
 ```{r, eval=FALSE, include=TRUE}
 # rainfall - 2021
 rnf <- stack("Data/Rainfall/dataset-sis-biodiversity-cmip5-global-83e8ca0e-4eea-4051-a911-c3299d0f2380 (1)/BIO12_gfdl-esm2m_rcp85_r1i1p1_1950-2100_v1.0.nc")
+
 rnf <- mean(rnf[[72]])*3600*24*365*1000
 plot(rnf)
 ```
@@ -372,7 +373,7 @@ pal <- wes_palette("Zissou1", 100, type = "continuous")
 
 ## Load ppt data
 
-```{r}
+```{r, eval=FALSE, include=TRUE}
 fut_ppt <- stack("Data/Rainfall/dataset-sis-biodiversity-cmip5-global-83e8ca0e-4eea-4051-a911-c3299d0f2380 (1)/BIO12_gfdl-esm2m_rcp85_r1i1p1_1950-2100_v1.0.nc")
 plot(fut_ppt, col = pal)
 ```
@@ -385,7 +386,7 @@ library(tigris)
 us <- states(cb = TRUE) %>% 
   filter(!NAME %in% c("Puerto Rico", "Guam", "American Samoa", "United States Virgin Islands", "Commonwealth of the Northern Mariana Islands", "Alaska", "Hawaii")) 
 
-plot(fut_ppt[[1]])
+#plot(fut_ppt[[1]])
 plot(st_geometry(us), add = TRUE)
 ```
 
@@ -401,7 +402,7 @@ plot(st_geometry(us), add = TRUE)
 - 2100
 
 
-```{r}
+```{r, eval=FALSE, include=TRUE}
 # 2030s
 y2030 <- fut_ppt[[81]]*3600*24*365*1000
 plot(y2030)
@@ -468,7 +469,7 @@ raster::writeRaster(mask_ppt, filename = file.path("Data/FUTURE_PROJECTIONS/res_
 
 
 ```{r}
-res_ppt <- stack("Data/FUTURE_PROJECTIONS/res_ppt_sj.tif")
+res_ppt <- stack("Data/Future projections/res_ppt_sj.tif")
 #res_ppt <- res_ppt*3600*24*365*1000
 names(res_ppt) <- c("2030", "2050", "2070", "2100")
 plot(res_ppt)
@@ -507,7 +508,7 @@ names(RUSLE_1_future) <- c("2030", "2050", "2070", "2100")
 plot(RUSLE_1_future)
 
 # save 
-raster::writeRaster(RUSLE_1_future, filename = file.path("RUSLE_1_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
+raster::writeRaster(RUSLE_1_future, filename = file.path("Data/RUSLE/RUSLE_1_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
 ```
 
 
@@ -522,7 +523,7 @@ names(RUSLE_2_future) <- c("2030", "2050", "2070", "2100")
 plot(RUSLE_2_future)
 
 # save 
-raster::writeRaster(RUSLE_2_future, filename = file.path("RUSLE_2_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
+raster::writeRaster(RUSLE_2_future, filename = file.path("Data/RUSLE/RUSLE_2_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
 ```
 
 
@@ -537,12 +538,14 @@ names(RUSLE_3_future) <- c("2030", "2050", "2070", "2100")
 plot(RUSLE_3_future)
 
 # save 
-raster::writeRaster(RUSLE_3_future, filename = file.path("RUSLE_3_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
+raster::writeRaster(RUSLE_3_future, filename = file.path("Data/RUSLE/RUSLE_3_future.tif"), format="GTiff", bylayer = TRUE, overwrite=TRUE)
 ```
 
 
 
 # EDA
+
+## Rainfall 
 
 ```{r}
 rnf_sj <- raster::resample(rnf_sj, res_ppt, method = "bilinear")
