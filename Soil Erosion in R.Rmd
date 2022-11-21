@@ -387,7 +387,7 @@ us <- states(cb = TRUE) %>%
   filter(!NAME %in% c("Puerto Rico", "Guam", "American Samoa", "United States Virgin Islands", "Commonwealth of the Northern Mariana Islands", "Alaska", "Hawaii")) 
 
 #plot(fut_ppt[[1]])
-plot(st_geometry(us), add = TRUE)
+plot(st_geometry(us))
 ```
 
 
@@ -477,7 +477,7 @@ plot(res_ppt)
 # comparison of decades
 ppt_df <- res_ppt %>% 
   as.data.frame(xy = TRUE) %>% 
-  pivot_longer(names_to = "key", values_to = "value", cols = c(3:4)) %>% 
+  pivot_longer(names_to = "key", values_to = "value", cols = c(3:6)) %>% 
   filter(!is.na(value))
 
 ppt_df %>% 
