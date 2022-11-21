@@ -277,7 +277,7 @@ plot(ls_factor)
 
 
 ```{r}
-cs <- raster("Data/Crop Cover/drive-download-20221025T182147Z-001/Reclassify_SJ_Cropcover_2021.tif")
+cs <- raster("Data/Crop cover/Reclassify_SJ_Cropcover_2021.tif")
 plot(cs)
 
 # crop and mask
@@ -293,9 +293,9 @@ plot(c_factor)
 
 ## Support Practices: Cropping (P-factor)
 
-- Ctillage = 1 for conventional Strip cropping;
-- Ctillage = 0.35 for conservation contour cropping; 
-- Ctillage = 0.25 for terrace cropping.
+- Cmanagementpractices = 1 for conventional Strip cropping;
+- Cmanagementpractices = 0.35 for conservation contour cropping; 
+- Cmanagementpractices = 0.25 for terrace cropping.
 
 
 # Erosion calculation
@@ -318,7 +318,7 @@ RUSLE_1 <- r_moore * e_factor * ls_factor * c_factor * 1
 plot(RUSLE_1)
 
 # save 
-raster::writeRaster(RUSLE_1, filename = file.path("RUSLE_1.tif"), format="GTiff", overwrite=TRUE)
+raster::writeRaster(RUSLE_1, filename = file.path("Data/RUSLE/RUSLE_1.tif"), format="GTiff", overwrite=TRUE)
 ```
 
 
@@ -332,7 +332,7 @@ RUSLE_2 <- r_moore * e_factor * ls_factor * c_factor * 0.35
 plot(RUSLE_2)
 
 # save 
-raster::writeRaster(RUSLE_2, filename = file.path("RUSLE_2.tif"), format="GTiff", overwrite=TRUE)
+raster::writeRaster(RUSLE_2, filename = file.path("Data/RUSLE/RUSLE_2.tif"), format="GTiff", overwrite=TRUE)
 ```
 
 
@@ -346,7 +346,7 @@ RUSLE_3 <- r_moore * e_factor * ls_factor * c_factor * 0.25
 plot(RUSLE_3)
 
 # save 
-raster::writeRaster(RUSLE_3, filename = file.path("RUSLE_3.tif"), format="GTiff", overwrite=TRUE)
+raster::writeRaster(RUSLE_3, filename = file.path("Data/RUSLE/RUSLE_3.tif"), format="GTiff", overwrite=TRUE)
 ```
 
 
